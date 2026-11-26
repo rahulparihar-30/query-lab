@@ -1,0 +1,5 @@
+{$QUERYLAB_DOMAIN} {
+    reverse_proxy web:3000 {
+        header_up X-QueryLab-Client-IP {remote_host}
+    }
+}

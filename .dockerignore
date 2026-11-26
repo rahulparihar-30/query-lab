@@ -1,0 +1,7 @@
+*
+!*.mjs
+!index.html
+!style.css
+!app.js
+!favicon.png
+!Dockerfile

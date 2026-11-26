@@ -1,0 +1,44 @@
+services:
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      QUERYLAB_DOMAIN: ${QUERYLAB_DOMAIN:?Set QUERYLAB_DOMAIN}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - certificates:/data
+    networks: [front]
+  web:
+    build: .
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PUBLIC_ORIGIN: https://${QUERYLAB_DOMAIN}
+      DATABASE_PATH: /data/querylab.sqlite
+      RUNNER_URL: http://runner:3001/evaluate
+    volumes:
+      - database:/data
+    networks: [front, sandbox]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    read_only: true
+    mem_limit: 384m
+  runner:
+    build: .
+    command: ["node", "runner-server.mjs"]
+    restart: unless-stopped
+    networks: [sandbox]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    read_only: true
+    mem_limit: 256m
+    pids_limit: 40
+    cpus: 1
+networks:
+  front:
+  sandbox:
+    internal: true
+volumes:
+  database:
+  certificates:

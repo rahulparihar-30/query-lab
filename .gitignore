@@ -1,3 +1,6 @@
 *.sqlite
 *.sqlite-*
 .env
+node_modules/
+.vercel/
+.env.*

@@ -1,1 +1,1 @@
-{"name":"querylab","private":true,"type":"module","scripts":{"start":"node server.mjs"},"engines":{"node":">=24.10.0"}}
+{"name":"querylab","private":true,"type":"module","scripts":{"start":"node server.mjs"},"engines":{"node":"24.x"},"dependencies":{"@neondatabase/serverless":"^1.0.2"}}

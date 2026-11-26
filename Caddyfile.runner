@@ -1,0 +1,4 @@
+{$RUNNER_DOMAIN} {
+    reverse_proxy /evaluate runner:3001
+    respond 404
+}

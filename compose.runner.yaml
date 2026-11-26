@@ -1,0 +1,30 @@
+services:
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    environment:
+      RUNNER_DOMAIN: ${RUNNER_DOMAIN:?Set RUNNER_DOMAIN}
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./Caddyfile.runner:/etc/caddy/Caddyfile:ro
+      - runner_certificates:/data
+    networks: [front, sandbox]
+  runner:
+    build: .
+    command: ["node", "runner-server.mjs"]
+    restart: unless-stopped
+    environment:
+      RUNNER_TOKEN: ${RUNNER_TOKEN:?Set RUNNER_TOKEN}
+    networks: [sandbox]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    read_only: true
+    mem_limit: 256m
+    pids_limit: 40
+    cpus: 1
+networks:
+  front:
+  sandbox:
+    internal: true
+volumes:
+  runner_certificates:

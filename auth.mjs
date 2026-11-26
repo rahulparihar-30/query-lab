@@ -9,25 +9,19 @@ const dummyHash=randomBytes(64);
 const hashPassword=(password,salt)=>derive(password,salt,64,{N:131072,r:8,p:1,maxmem:160*1024*1024});
 
 export function accounts(db,secure){
- db.exec(`
- CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, salt TEXT NOT NULL, hash BLOB NOT NULL);
- CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires INTEGER NOT NULL);
- CREATE INDEX IF NOT EXISTS sessions_expiry ON sessions(expires);
- `);
  const cookieName=secure?'__Host-querylab':'querylab';
  const cookie=(token,age)=>`${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${secure?'; Secure':''}`;
  const tokenOf=req=>req.headers.cookie?.match(new RegExp('(?:^|; *)'+cookieName+'=([a-f0-9]{64})(?:;|$)'))?.[1];
- const byName=db.prepare('SELECT * FROM users WHERE username=?');
  const now=()=>Math.floor(Date.now()/1000);
  let hashing=false;
  return {
   get(req){
    const token=tokenOf(req);
-   return token && db.prepare('SELECT users.id,users.username FROM sessions JOIN users ON users.id=sessions.user_id WHERE token=? AND expires>?').get(digest(token),now());
+   return token && db.session(digest(token),now());
   },
-  logout(req,res){
+  async logout(req,res){
    const token=tokenOf(req);
-   if(token) db.prepare('DELETE FROM sessions WHERE token=?').run(digest(token));
+   if(token) await db.removeSession(digest(token));
    res.setHeader('Set-Cookie',cookie('',0));
   },
   async authenticate(req,res,register,input){
@@ -38,23 +32,24 @@ export function accounts(db,secure){
    if(hashing) return [429,{error:'Sign-in is busy. Try again shortly.'}];
    hashing=true;
    try {
-    let user=byName.get(username);
+    let user=await db.byName(username);
     const salt=register?randomBytes(16).toString('hex'):user?.salt||dummySalt;
     const hash=await hashPassword(password,salt);
     if(register){
      if(user)return [409,{error:'That username is unavailable.'}];
      user={id:randomUUID(),username};
-     db.prepare('INSERT INTO users VALUES(?,?,?,?)').run(user.id,username,salt,hash);
+     if(!await db.addUser(user.id,username,salt,hash))return [409,{error:'That username is unavailable.'}];
     }else if(!timingSafeEqual(hash,user?.hash||dummyHash)||!user){
      return [401,{error:'Incorrect username or password.'}];
     }
-    this.logout(req,res);
-    db.prepare('DELETE FROM sessions WHERE expires<=?').run(now());
+    await this.logout(req,res);
+    await db.cleanup(now());
     const token=randomBytes(32).toString('hex');
-    db.prepare('INSERT INTO sessions VALUES(?,?,?)').run(digest(token),user.id,now()+lifetime);
+    await db.addSession(digest(token),user.id,now()+lifetime);
     res.setHeader('Set-Cookie',cookie(token,lifetime));
     return [200,{username}];
    }finally{hashing=false}
   }
  };
 }
+
